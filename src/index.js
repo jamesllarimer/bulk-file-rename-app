@@ -1,50 +1,112 @@
-const { app, BrowserWindow, dialog, ipcMain} = require('electron');
-const path = require('node:path');
-// Handle creating/removing shortcuts on Windows when installing/uninstalling.
-if (require('electron-squirrel-startup')) {
-  app.quit();
-}
+// main.js
+const { app, BrowserWindow, ipcMain, dialog } = require('electron')
+const path = require('path')
+const fs = require('fs/promises')
+const csv = require('csv-parse')
+const ExifImage = require('exif').ExifImage
 
 function createWindow() {
-  const mainWindow = new BrowserWindow({
+  const win = new BrowserWindow({
     width: 800,
     height: 600,
-     webPreferences: {
-      nodeIntegration: true,  // Enable nodeIntegration in the renderer process
-      contextIsolation: false,  // You can disable context isolation if nodeIntegration is true
-      enableRemoteModule: false,  // Disable the remote module (not needed and not recommended)
-    },
-  });
-
-  // and load the index.html of the app.
-  mainWindow.loadFile(path.join(__dirname, 'index.html'));
-
-  // Open the DevTools.
-  mainWindow.webContents.openDevTools();
-};
-// Handle dialog requests from the renderer
-// This method will be called when Electron has finished
-// initialization and is ready to create browser windows.
-// Some APIs can only be used after this event occurs.
-app.whenReady().then(() => {
-  createWindow();
-  // On OS X it's common to re-create a window in the app when the
-  // dock icon is clicked and there are no other windows open.
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-      createWindow();
+    webPreferences: {
+      nodeIntegration: true,
+      contextIsolation: false
     }
-  });
-});
+  })
 
-// Quit when all windows are closed, except on macOS. There, it's common
-// for applications and their menu bar to stay active until the user quits
-// explicitly with Cmd + Q.
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
-    app.quit();
+  win.loadFile(path.join(__dirname, 'index.html'));
+  // // Open the DevTools.
+  // win.webContents.openDevTools();
+}
+
+app.whenReady().then(createWindow)
+
+// Handle CSV file selection
+ipcMain.handle('select-csv', async () => {
+  const result = await dialog.showOpenDialog({
+    properties: ['openFile'],
+    filters: [{ name: 'CSV', extensions: ['csv'] }]
+  })
+  
+  if (!result.canceled) {
+    const csvPath = result.filePaths[0]
+    const csvContent = await fs.readFile(csvPath, 'utf-8')
+    
+    return new Promise((resolve, reject) => {
+      csv.parse(csvContent, { columns: true }, (err, data) => {
+        if (err) reject(err)
+        resolve(data)
+      })
+    })
   }
-});
+  return null
+})
 
-// In this file you can include the rest of your app's specific main process
-// code. You can also put them in separate files and import them here.
+// Handle folder selection
+ipcMain.handle('select-folder', async () => {
+  const result = await dialog.showOpenDialog({
+    properties: ['openDirectory']
+  })
+  
+  if (!result.canceled) {
+    return result.filePaths[0]
+  }
+  return null
+})
+
+// Get EXIF data from image
+async function getImageDate(imagePath) {
+  return new Promise((resolve, reject) => {
+    new ExifImage({ image: imagePath }, (error, exifData) => {
+      if (error) {
+        resolve(null) // Return null if no EXIF data
+      } else {
+        const dateTimeOriginal = exifData.exif.DateTimeOriginal
+        resolve(dateTimeOriginal ? new Date(dateTimeOriginal) : null)
+      }
+    })
+  })
+}
+
+// Handle renaming process
+ipcMain.handle('rename-files', async (event, { folderPath, csvData }) => {
+  try {
+    // Get all image files from the folder
+    const files = await fs.readdir(folderPath)
+    const imageFiles = files.filter(file => /\.(jpg|jpeg|png)$/i.test(file))
+    
+    // Get dates for all images
+    const imageData = await Promise.all(
+      imageFiles.map(async file => {
+        const fullPath = path.join(folderPath, file)
+        const date = await getImageDate(fullPath)
+        return { file, date, fullPath }
+      })
+    )
+    
+    // Sort images by date
+    const sortedImages = imageData
+      .filter(img => img.date) // Only include images with valid dates
+      .sort((a, b) => a.date - b.date)
+    
+    // Rename files
+    for (let i = 0; i < Math.min(sortedImages.length, csvData.length); i++) {
+      const newName = csvData[i].FileName + ".jpg"
+      const oldPath = sortedImages[i].fullPath
+      const newPath = path.join(folderPath, newName)
+      
+      await fs.rename(oldPath, newPath)
+    }
+    
+    return {
+      success: true,
+      message: `Renamed ${Math.min(sortedImages.length, csvData.length)} files`
+    }
+  } catch (error) {
+    return {
+      success: false,
+      message: error.message
+    }
+  }
+})

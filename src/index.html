@@ -1,17 +1,97 @@
+<!-- index.html -->
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Image Renamer</title>
+  <title>Image File Renamer</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    .container {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+    button {
+      padding: 10px 20px;
+      cursor: pointer;
+    }
+    .status {
+      margin-top: 20px;
+      padding: 10px;
+      border-radius: 4px;
+    }
+    .success {
+      background-color: #d4edda;
+      color: #155724;
+    }
+    .error {
+      background-color: #f8d7da;
+      color: #721c24;
+    }
+  </style>
 </head>
 <body>
-  <h1>Select CSV and Folder</h1>
-  <button id="select-csv">Select CSV</button>
-  <span id="csv-path"></span>
-  <br><br>
-  <button id="select-folder">Select Folder</button>
-  <span id="folder-path"></span>
-  <br><br>
-  <button id="start-process">Start Process</button>
-  <script src="renderer.js"></script>
+  <div class="container">
+    <h1>Image File Renamer</h1>
+    
+    <div>
+      <button id="selectCsv">Select CSV File</button>
+      <span id="csvStatus"></span>
+    </div>
+    
+    <div>
+      <button id="selectFolder">Select Images Folder</button>
+      <span id="folderStatus"></span>
+    </div>
+    
+    <button id="startRename" disabled>Start Renaming</button>
+    
+    <div id="status"></div>
+  </div>
+
+  <script>
+    const { ipcRenderer } = require('electron')
+    
+    let csvData = null
+    let selectedFolder = null
+    
+    document.getElementById('selectCsv').addEventListener('click', async () => {
+      csvData = await ipcRenderer.invoke('select-csv')
+      if (csvData) {
+        document.getElementById('csvStatus').textContent = 
+          `CSV loaded with ${csvData.length} entries`
+        updateStartButton()
+      }
+    })
+    
+    document.getElementById('selectFolder').addEventListener('click', async () => {
+      selectedFolder = await ipcRenderer.invoke('select-folder')
+      if (selectedFolder) {
+        document.getElementById('folderStatus').textContent = 
+          `Selected folder: ${selectedFolder}`
+        updateStartButton()
+      }
+    })
+    
+    document.getElementById('startRename').addEventListener('click', async () => {
+      const result = await ipcRenderer.invoke('rename-files', {
+        folderPath: selectedFolder,
+        csvData: csvData
+      })
+      
+      const statusDiv = document.getElementById('status')
+      statusDiv.textContent = result.message
+      statusDiv.className = `status ${result.success ? 'success' : 'error'}`
+    })
+    
+    function updateStartButton() {
+      const startButton = document.getElementById('startRename')
+      startButton.disabled = !(csvData && selectedFolder)
+    }
+  </script>
 </body>
 </html>
