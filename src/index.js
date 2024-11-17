@@ -5,10 +5,13 @@ const fs = require('fs/promises')
 const csv = require('csv-parse')
 const ExifImage = require('exif').ExifImage
 
+// Update valid file extensions to include ARW
+const VALID_EXTENSIONS = /\.(jpg|jpeg|png|arw)$/i
+
 function createWindow() {
   const win = new BrowserWindow({
-    width: 800,
-    height: 600,
+    width: 1200,
+    height: 800,
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false
@@ -16,13 +19,13 @@ function createWindow() {
   })
 
   win.loadFile(path.join(__dirname, 'index.html'));
-  // // Open the DevTools.
-  // win.webContents.openDevTools();
+    // Open the DevTools.
+  win.webContents.openDevTools();
 }
 
 app.whenReady().then(createWindow)
 
-// Handle CSV file selection
+// Handle CSV file selection with improved validation
 ipcMain.handle('select-csv', async () => {
   const result = await dialog.showOpenDialog({
     properties: ['openFile'],
@@ -36,31 +39,87 @@ ipcMain.handle('select-csv', async () => {
     return new Promise((resolve, reject) => {
       csv.parse(csvContent, { columns: true }, (err, data) => {
         if (err) reject(err)
-        resolve(data)
+        // Filter out rows where FileName is empty or only whitespace
+        const validRows = data.filter(row => 
+          row.FileName && 
+          row.FileName.trim().length > 0 &&
+          Object.values(row).some(value => value && value.trim().length > 0)
+        )
+        resolve(validRows)
       })
     })
   }
   return null
 })
 
-// Handle folder selection
+// Handle folder selection with ARW support
 ipcMain.handle('select-folder', async () => {
   const result = await dialog.showOpenDialog({
     properties: ['openDirectory']
   })
   
   if (!result.canceled) {
-    return result.filePaths[0]
+    const folderPath = result.filePaths[0]
+    const files = await fs.readdir(folderPath)
+    const imageFiles = files.filter(file => VALID_EXTENSIONS.test(file))
+    
+    return {
+      path: folderPath,
+      imageCount: imageFiles.length,
+      fileTypes: getFileTypeSummary(imageFiles)
+    }
   }
   return null
 })
 
-// Get EXIF data from image
+// Helper function to summarize file types
+function getFileTypeSummary(files) {
+  const summary = files.reduce((acc, file) => {
+    const ext = path.extname(file).toLowerCase()
+    acc[ext] = (acc[ext] || 0) + 1
+    return acc
+  }, {})
+  return summary
+}
+
+// Get EXIF data and prepare preview data
+ipcMain.handle('prepare-preview', async (event, { folderPath }) => {
+  try {
+    const files = await fs.readdir(folderPath)
+    const imageFiles = files.filter(file => VALID_EXTENSIONS.test(file))
+    
+    const imageData = await Promise.all(
+      imageFiles.map(async file => {
+        const fullPath = path.join(folderPath, file)
+        const date = await getImageDate(fullPath)
+        const stats = await fs.stat(fullPath)
+        const fileType = path.extname(file).toLowerCase()
+        
+        return {
+          file,
+          originalName: file,
+          path: fullPath,
+          date: date || stats.mtime,
+          size: stats.size,
+          fileType
+        }
+      })
+    )
+    
+    return imageData.sort((a, b) => a.date - b.date)
+  } catch (error) {
+    return {
+      error: error.message
+    }
+  }
+})
+
+// Updated EXIF reader to handle ARW files
 async function getImageDate(imagePath) {
   return new Promise((resolve, reject) => {
     new ExifImage({ image: imagePath }, (error, exifData) => {
       if (error) {
-        resolve(null) // Return null if no EXIF data
+        resolve(null)
       } else {
         const dateTimeOriginal = exifData.exif.DateTimeOriginal
         resolve(dateTimeOriginal ? new Date(dateTimeOriginal) : null)
@@ -69,44 +128,4 @@ async function getImageDate(imagePath) {
   })
 }
 
-// Handle renaming process
-ipcMain.handle('rename-files', async (event, { folderPath, csvData }) => {
-  try {
-    // Get all image files from the folder
-    const files = await fs.readdir(folderPath)
-    const imageFiles = files.filter(file => /\.(jpg|jpeg|png)$/i.test(file))
-    
-    // Get dates for all images
-    const imageData = await Promise.all(
-      imageFiles.map(async file => {
-        const fullPath = path.join(folderPath, file)
-        const date = await getImageDate(fullPath)
-        return { file, date, fullPath }
-      })
-    )
-    
-    // Sort images by date
-    const sortedImages = imageData
-      .filter(img => img.date) // Only include images with valid dates
-      .sort((a, b) => a.date - b.date)
-    
-    // Rename files
-    for (let i = 0; i < Math.min(sortedImages.length, csvData.length); i++) {
-      const newName = csvData[i].FileName + ".jpg"
-      const oldPath = sortedImages[i].fullPath
-      const newPath = path.join(folderPath, newName)
-      
-      await fs.rename(oldPath, newPath)
-    }
-    
-    return {
-      success: true,
-      message: `Renamed ${Math.min(sortedImages.length, csvData.length)} files`
-    }
-  } catch (error) {
-    return {
-      success: false,
-      message: error.message
-    }
-  }
-})
+// Rest of the main.js file remains the same...
