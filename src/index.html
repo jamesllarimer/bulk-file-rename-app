@@ -1,172 +1,251 @@
 <!DOCTYPE html>
 <html>
-<head>
-  <title>Image File Renamer</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      padding: 20px;
-      max-width: 1100px;
-      margin: 0 auto;
-    }
-    .container {
-      display: flex;
-      flex-direction: column;
-      gap: 20px;
-    }
-    button {
-      padding: 10px 20px;
-      cursor: pointer;
-    }
-    button:disabled {
-      cursor: not-allowed;
-      opacity: 0.6;
-    }
-    .status {
-      margin-top: 20px;
-      padding: 10px;
-      border-radius: 4px;
-    }
-    .success {
-      background-color: #d4edda;
-      color: #155724;
-    }
-    .error {
-      background-color: #f8d7da;
-      color: #721c24;
-    }
-    .warning {
-      background-color: #fff3cd;
-      color: #856404;
-    }
-    .validation {
-      font-size: 0.9em;
-      margin-top: 5px;
-    }
-    .preview-container {
-      margin-top: 20px;
-      max-height: 500px;
-      overflow-y: auto;
-      border: 1px solid #ddd;
-      border-radius: 4px;
-      padding: 10px;
-    }
-    .preview-item {
-      display: flex;
-      align-items: center;
-      padding: 10px;
-      border-bottom: 1px solid #eee;
-      gap: 20px;
-    }
-    .preview-item:last-child {
-      border-bottom: none;
-    }
-    .preview-image {
-      width: 100px;
-      height: 100px;
-      object-fit: cover;
-      border-radius: 4px;
-    }
-    .preview-details {
-      flex-grow: 1;
-    }
-    .name-change {
-      display: flex;
-      flex-direction: column;
-      gap: 5px;
-    }
-    .arrow {
-      color: #666;
-    }
-    .preview-controls {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin: 10px 0;
-    }
-    .hidden {
-      display: none;
-    }
-    .file-summary {
-    font-size: 0.9em;
-    color: #666;
-    margin-top: 5px;
-  }
-  .file-type {
-    display: inline-block;
-    padding: 2px 6px;
-    border-radius: 3px;
-    background: #e9ecef;
-    margin-right: 5px;
-    font-size: 0.8em;
-  }
-  .preview-meta {
-    font-size: 0.8em;
-    color: #666;
-    margin-top: 5px;
-  }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <h1>Image File Renamer</h1>
-    
-    <div>
-      <button id="selectCsv">Select CSV File</button>
-      <span id="csvStatus"></span>
-    </div>
-    
-    <div>
-      <button id="selectFolder">Select Images Folder</button>
-      <span id="folderStatus"></span>
-    </div>
-    
-    <div id="validation" class="validation"></div>
-    
-    <button id="showPreview" disabled>Show Preview</button>
-    
-    <div id="previewContainer" class="preview-container hidden">
-      <div class="preview-controls">
-        <h3>Preview Changes</h3>
-        <button id="startRename" disabled>Proceed with Rename</button>
-      </div>
-      <div id="previewList"></div>
-    </div>
-    
-    <div id="status"></div>
-  </div>
+  <head>
+    <title>Image File Renamer</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        padding: 20px;
+        max-width: 1100px;
+        margin: 0 auto;
+      }
+      .container {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+      }
+      button {
+        padding: 10px 20px;
+        cursor: pointer;
+      }
+      button:disabled {
+        cursor: not-allowed;
+        opacity: 0.6;
+      }
+      .status {
+        margin-top: 20px;
+        padding: 10px;
+        border-radius: 4px;
+      }
+      .success {
+        background-color: #d4edda;
+        color: #155724;
+      }
+      .error {
+        background-color: #f8d7da;
+        color: #721c24;
+      }
+      .warning {
+        background-color: #fff3cd;
+        color: #856404;
+      }
+      .validation {
+        font-size: 0.9em;
+        margin-top: 5px;
+      }
+      .preview-container {
+        margin-top: 20px;
+        max-height: 500px;
+        overflow-y: auto;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        padding: 10px;
+      }
+      .preview-item {
+        display: flex;
+        align-items: center;
+        padding: 10px;
+        border-bottom: 1px solid #eee;
+        gap: 20px;
+      }
+      .preview-item:last-child {
+        border-bottom: none;
+      }
+      .preview-image {
+        width: 100px;
+        height: 100px;
+        object-fit: cover;
+        border-radius: 4px;
+      }
+      .preview-details {
+        flex-grow: 1;
+      }
+      .name-change {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+      }
+      .arrow {
+        color: #666;
+      }
+      .preview-controls {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin: 10px 0;
+      }
+      .hidden {
+        display: none;
+      }
+      .file-summary {
+        font-size: 0.9em;
+        color: #666;
+        margin-top: 5px;
+      }
+      .file-type {
+        display: inline-block;
+        padding: 2px 6px;
+        border-radius: 3px;
+        background: #e9ecef;
+        margin-right: 5px;
+        font-size: 0.8em;
+      }
+      .preview-meta {
+        font-size: 0.8em;
+        color: #666;
+        margin-top: 5px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>Image File Renamer</h1>
 
-  <script>
-    const { ipcRenderer } = require('electron')
-    
-    let csvData = null
-    let selectedFolder = null
-    let imageCount = 0
-    let previewData = null
-    
-    document.getElementById('selectCsv').addEventListener('click', async () => {
-      csvData = await ipcRenderer.invoke('select-csv')
-      if (csvData) {
-        document.getElementById('csvStatus').textContent = 
-          `CSV loaded with ${csvData.length} records`
-        validateCounts()
-        updateButtons()
-      }
-    })
-    
-    document.getElementById('selectFolder').addEventListener('click', async () => {
-      const result = await ipcRenderer.invoke('select-folder')
-      if (result) {
-        selectedFolder = result.path
-        imageCount = result.imageCount
-        document.getElementById('folderStatus').textContent = 
-          `Selected folder: ${selectedFolder} (${imageCount} images)`
-        validateCounts()
-        updateButtons()
-      }
-    })
-    
-    function validateCounts() {
+      <div>
+        <button id="selectCsv">Select CSV File</button>
+        <span id="csvStatus"></span>
+      </div>
+
+      <div>
+        <button id="selectFolder">Select Images Folder</button>
+        <span id="folderStatus"></span>
+      </div>
+
+      <div id="validation" class="validation"></div>
+
+      <button id="showPreview" disabled>Show Preview</button>
+
+      <div id="previewContainer" class="preview-container hidden">
+        <div class="preview-controls">
+          <h3>Preview Changes</h3>
+          <button id="startRename" disabled>Proceed with Rename</button>
+        </div>
+        <div id="previewList"></div>
+      </div>
+
+      <div id="status"></div>
+    </div>
+
+    <script>
+      const { ipcRenderer } = require("electron");
+
+      let csvData = null;
+      let selectedFolder = null;
+      let imageCount = 0;
+      let previewData = null;
+
+      document
+        .getElementById("selectCsv")
+        .addEventListener("click", async () => {
+          csvData = await ipcRenderer.invoke("select-csv");
+          if (csvData) {
+            document.getElementById(
+              "csvStatus"
+            ).textContent = `CSV loaded with ${csvData.length} valid records`;
+            validateCounts();
+            updateButtons();
+          }
+        });
+
+      document
+        .getElementById("selectFolder")
+        .addEventListener("click", async () => {
+          const result = await ipcRenderer.invoke("select-folder");
+          if (result) {
+            selectedFolder = result.path;
+            imageCount = result.imageCount;
+
+            // Create file type summary display
+            const fileTypes = Object.entries(result.fileTypes)
+              .map(([ext, count]) => `${count}${ext}`)
+              .join(", ");
+
+            document.getElementById(
+              "folderStatus"
+            ).innerHTML = `Selected folder: ${selectedFolder}<br>
+         <div class="file-summary">
+           Found ${imageCount} files: ${fileTypes}
+         </div>`;
+
+            validateCounts();
+            updateButtons();
+          }
+        });
+
+      document
+        .getElementById("showPreview")
+        .addEventListener("click", async () => {
+          previewData = await ipcRenderer.invoke("prepare-preview", {
+            folderPath: selectedFolder,
+          });
+
+          if (previewData.error) {
+            const statusDiv = document.getElementById("status");
+            statusDiv.textContent = `Error preparing preview: ${previewData.error}`;
+            statusDiv.className = "status error";
+            return;
+          }
+
+          const previewContainer = document.getElementById("previewContainer");
+          const previewList = document.getElementById("previewList");
+          previewList.innerHTML = "";
+
+          previewData.forEach((image, index) => {
+            const div = document.createElement("div");
+            div.className = "preview-item";
+
+            // Show placeholder for ARW files
+            const img = document.createElement("img");
+            if (image.fileType.toLowerCase() === ".arw") {
+              // Create a placeholder for RAW files
+              img.src =
+                "data:image/svg+xml;charset=UTF-8," +
+                encodeURIComponent(`
+          <svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100">
+            <rect width="100" height="100" fill="#f0f0f0"/>
+            <text x="50" y="50" text-anchor="middle" dy=".3em" font-family="Arial" font-size="14">RAW</text>
+          </svg>
+        `);
+            } else {
+              img.src = `file://${image.path}`;
+            }
+            img.className = "preview-image";
+
+            const details = document.createElement("div");
+            details.className = "preview-details";
+            console.log(image)
+            const nameChange = document.createElement("div");
+            nameChange.className = "name-change";
+            nameChange.innerHTML = `
+        <div>Original: ${image.originalName}</div>
+        <div class="arrow">↓</div>
+        <div>New: ${csvData[index].FileName}</div>
+        <div class="preview-meta">
+          <span class="file-type">${image.fileType.toUpperCase()}</span>
+          Date: ${image.date.toLocaleString()}
+        </div>
+      `;
+
+            details.appendChild(nameChange);
+            div.appendChild(img);
+            div.appendChild(details);
+            previewList.appendChild(div);
+          });
+
+          previewContainer.classList.remove("hidden");
+          document.getElementById("startRename").disabled = false;
+        });
+        function validateCounts() {
       const validationDiv = document.getElementById('validation')
       if (csvData && imageCount > 0) {
         if (csvData.length === imageCount) {
@@ -179,8 +258,15 @@
         }
       }
     }
-    
-    document.getElementById('showPreview').addEventListener('click', async () => {
+      function updateButtons() {
+        const showPreviewButton = document.getElementById("showPreview");
+        showPreviewButton.disabled = !(
+          csvData &&
+          selectedFolder &&
+          csvData.length === imageCount
+        );
+      }
+      document.getElementById('showPreview').addEventListener('click', async () => {
       previewData = await ipcRenderer.invoke('prepare-preview', {
         folderPath: selectedFolder
       })
@@ -246,6 +332,6 @@
       const showPreviewButton = document.getElementById('showPreview')
       showPreviewButton.disabled = !(csvData && selectedFolder && csvData.length === imageCount)
     }
-  </script>
-</body>
+    </script>
+  </body>
 </html>
