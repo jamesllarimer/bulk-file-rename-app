@@ -4,6 +4,8 @@ const path = require('path')
 const fs = require('fs/promises')
 const csv = require('csv-parse')
 const ExifImage = require('exif').ExifImage
+const { ExifTool } = require('exiftool-vendored');
+const exiftool = new ExifTool();
 
 // Update valid file extensions to include ARW
 const VALID_EXTENSIONS = /\.(jpg|jpeg|png|arw)$/i
@@ -127,5 +129,81 @@ async function getImageDate(imagePath) {
     })
   })
 }
+ipcMain.handle('select-image', () => {
+  return dialog.showOpenDialog({
+    properties: ['openFile'],
+    filters: [
+      { name: 'Images', extensions: ['jpg', 'jpeg', 'png', 'arw', 'cr2', 'nef'] }
+    ]
+  });
+});
 
-// Rest of the main.js file remains the same...
+ipcMain.handle('get-image-metadata', async (event, filepath) => {
+  try {
+    const metadata = await exiftool.read(filepath);
+    const dateTimeMetadata = {};
+
+    // Filter metadata to include only date and time information
+    Object.entries(metadata).forEach(([key, value]) => {
+      if (typeof value === 'object' && value !== null) {
+        Object.entries(value).forEach(([subKey, subValue]) => {
+          if (subValue instanceof Date || !isNaN(Date.parse(subValue))) {
+            if (!dateTimeMetadata[key]) {
+              dateTimeMetadata[key] = {};
+            }
+            dateTimeMetadata[key][subKey] = new Date(subValue).toLocaleString();
+          }
+        });
+      } else if (value instanceof Date || !isNaN(Date.parse(value))) {
+        dateTimeMetadata[key] = new Date(value).toLocaleString();
+      }
+    });
+
+    return dateTimeMetadata;
+  } catch (error) {
+    console.error('Error reading metadata:', error);
+    throw error;
+  }
+});
+
+// / Handle renaming process
+ipcMain.handle('rename-files', async (event, { folderPath, csvData }) => {
+  try {
+    // Get all image files from the folder
+    const files = await fs.readdir(folderPath)
+    const imageFiles = files.filter(file => /\.(jpg|jpeg|png)$/i.test(file))
+    
+    // Get dates for all images
+    const imageData = await Promise.all(
+      imageFiles.map(async file => {
+        const fullPath = path.join(folderPath, file)
+        const date = await getImageDate(fullPath)
+        return { file, date, fullPath }
+      })
+    )
+    
+    // Sort images by date
+    const sortedImages = imageData
+      .filter(img => img.date) // Only include images with valid dates
+      .sort((a, b) => a.date - b.date)
+    
+    // Rename files
+    for (let i = 0; i < Math.min(sortedImages.length, csvData.length); i++) {
+      const newName = csvData[i].FileName + ".jpg"
+      const oldPath = sortedImages[i].fullPath
+      const newPath = path.join(folderPath, newName)
+      
+      await fs.rename(oldPath, newPath)
+    }
+    
+    return {
+      success: true,
+      message: `Renamed ${Math.min(sortedImages.length, csvData.length)} files`
+    }
+  } catch (error) {
+    return {
+      success: false,
+      message: error.message
+    }
+  }
+})
